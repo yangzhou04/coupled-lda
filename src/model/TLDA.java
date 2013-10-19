@@ -37,9 +37,9 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
+import processor.IndexProcessor;
 import structure.Document;
 import structure.SemanticRole;
-import conventer.IndexConventer;
 import flag.SemanticRoleType;
 
 /**
@@ -59,7 +59,7 @@ public class Tlda {
      */
     private int[][] documents;
 
-    private IndexConventer indexConventer;
+    private IndexProcessor indexConventer;
 
     /**
      * vocabulary size
@@ -155,7 +155,7 @@ public class Tlda {
 
     public Tlda(List<Document> docs) throws IOException {
 
-        this.indexConventer = IndexConventer.getInstance();
+        this.indexConventer = IndexProcessor.getInstance();
         int[][] indexedDocs = indexConventer.mapping(docs);
         int V = indexConventer.getVocabulary();
         // int WC = ic.getWordCount();
