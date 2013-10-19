@@ -1,7 +1,7 @@
 package flag;
 
 public enum SemanticRoleType {
-    SUBJ("subject"), VERB("verb"), OBJ("object");
+    SUBJECT("subject"), PREDICATE("predicate"), OBJECT("object"), CONTEXT("context");
     private String role;
 
     SemanticRoleType(String role) {

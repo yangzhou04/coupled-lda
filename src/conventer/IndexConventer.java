@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
 
-import data.Document;
+import structure.Document;
 import flag.SemanticRoleType;
 
 /**
@@ -85,13 +85,13 @@ public class IndexConventer {
                         // statistic SVO count
                         if (tokenidx % 3 == 0) {
                             subjectCount++;
-                            int2Role.put(index, SemanticRoleType.SUBJ);
+                            int2Role.put(index, SemanticRoleType.SUBJECT);
                         } else if (tokenidx % 3 == 1) {
                             verbCount++;
-                            int2Role.put(index, SemanticRoleType.VERB);
+                            int2Role.put(index, SemanticRoleType.PREDICATE);
                         } else {
                             objectCount++;
-                            int2Role.put(index, SemanticRoleType.OBJ);
+                            int2Role.put(index, SemanticRoleType.OBJECT);
                         }
                         index++;
                     }
@@ -122,15 +122,15 @@ public class IndexConventer {
     }
 
     public boolean isSubject(int idx) {
-        return int2Role.get(idx) == SemanticRoleType.SUBJ;
+        return int2Role.get(idx) == SemanticRoleType.SUBJECT;
     }
 
     public boolean isObject(int idx) {
-        return int2Role.get(idx) == SemanticRoleType.OBJ;
+        return int2Role.get(idx) == SemanticRoleType.OBJECT;
     }
 
     public boolean isVerb(int idx) {
-        return int2Role.get(idx) == SemanticRoleType.VERB;
+        return int2Role.get(idx) == SemanticRoleType.PREDICATE;
     }
 
     public SemanticRoleType getRoleType(int idx) {

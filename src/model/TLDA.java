@@ -37,9 +37,9 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
+import structure.Document;
+import structure.SemanticRole;
 import conventer.IndexConventer;
-import data.Document;
-import data.SemanticRole;
 import flag.SemanticRoleType;
 
 /**
@@ -52,7 +52,7 @@ import flag.SemanticRoleType;
  * @author zhouyang
  */
 
-public class TLDA {
+public class Tlda {
 
     /**
      * document data (term lists)
@@ -153,7 +153,7 @@ public class TLDA {
 
     // private static int dispcol = 0;
 
-    public TLDA(List<Document> docs) throws IOException {
+    public Tlda(List<Document> docs) throws IOException {
 
         this.indexConventer = IndexConventer.getInstance();
         int[][] indexedDocs = indexConventer.mapping(docs);
@@ -196,7 +196,9 @@ public class TLDA {
             int N = documents[m].length;
             z[m] = new int[N];
             for (int n = 0; n < N; n++) {
-                if (indexConventer.getNullIndex() == documents[m][n]) { // ignore null role
+                if (indexConventer.getNullIndex() == documents[m][n]) { // ignore
+                                                                        // null
+                                                                        // role
                     continue;
                 }
 
@@ -453,7 +455,7 @@ public class TLDA {
         SAMPLE_LAG = sampleLag;
     }
 
-    public void getFrame() {
+    public void printTuple() {
         double[][] phi = getPhi();
         SemanticRoleType roleType;
         String word;
@@ -469,9 +471,9 @@ public class TLDA {
                 word = indexConventer.index2Word(w);
                 value = phi[k][w];
                 role = new SemanticRole(roleType, word, value);
-                if (roleType == SemanticRoleType.SUBJ) {
+                if (roleType == SemanticRoleType.SUBJECT) {
                     subjects.add(role);
-                } else if (roleType == SemanticRoleType.VERB) {
+                } else if (roleType == SemanticRoleType.PREDICATE) {
                     verbs.add(role);
                 } else {
                     objects.add(role);
@@ -489,9 +491,7 @@ public class TLDA {
             printSemanticRole(verbs);
             System.out.println("Object:");
             printSemanticRole(objects);
-
         }
-
     }
 
     private void printSemanticRole(List<SemanticRole> role) {
@@ -516,8 +516,9 @@ public class TLDA {
         for (int k = 0; k < K; k++) {
             System.out.println("Frame " + k);
             for (int w = 0; w < V; w++) {
-                System.out.println(w + ": " + indexConventer.index2Word(w) + ": "
-                        + phi[k][w] + ": " + indexConventer.getRoleType(w));
+                System.out.println(w + ": " + indexConventer.index2Word(w)
+                        + ": " + phi[k][w] + ": "
+                        + indexConventer.getRoleType(w));
             }
         }
     }
@@ -538,19 +539,21 @@ public class TLDA {
             docs.add(new Document(docLabel, read(dir + docLabel)));
         }
 
-        // int M = documents.length;
-        // # topics
-        int K = 5;
-        // good values alpha = 2, beta = .5
-        double alpha = 2;
-        double beta = .5;
+        System.out.println("Tuple Latent Dirichlet Allocation "
+                + "using Gibbs Sampling.");
 
-        System.out.println("Latent Dirichlet Allocation using Gibbs Sampling.");
+        Tlda lda = new Tlda(docs);
+        int iterations = 1000000;
+        int burnIn = 20000;
+        int thinInterval = 100;
+        int sampleLag = 10;
+        lda.configure(iterations, burnIn, thinInterval, sampleLag);
 
-        TLDA lda = new TLDA(docs);
-        lda.configure(1000000, 20000, 100, 10);
+        int K = 13; // Frame number
+        double alpha = 2; // good values
+        double beta = .5; // good values
         lda.gibbs(K, alpha, beta);
-        //
+
         // double[][] theta = lda.getTheta();
         // double[][] phi = lda.getPhi();
 
@@ -591,7 +594,7 @@ public class TLDA {
         // }
 
         lda.printFrame();
-        lda.getFrame();
+        lda.printTuple();
     }
 
 }
