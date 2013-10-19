@@ -1,6 +1,24 @@
+# Binary Files #
 *.class
+bin/
 
 # Package Files #
 *.jar
 *.war
 *.ear
+lib/
+
+# Eclipse configure files #
+.classpath
+.project
+
+# Experiment files #
+data/
+log/
+tmp/
+
+
+# system files
+*~
+*.lock
+.DS_STORE
