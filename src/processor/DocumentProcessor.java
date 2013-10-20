@@ -11,6 +11,7 @@ import edu.stanford.nlp.process.DocumentPreprocessor;
 import edu.stanford.nlp.trees.GrammaticalStructure;
 import edu.stanford.nlp.trees.GrammaticalStructureFactory;
 import edu.stanford.nlp.trees.Tree;
+import edu.stanford.nlp.trees.TreeGraphNode;
 import edu.stanford.nlp.trees.TreebankLanguagePack;
 import edu.stanford.nlp.trees.TypedDependency;
 
@@ -48,18 +49,34 @@ public class DocumentProcessor {
             GrammaticalStructure gs = gsf.newGrammaticalStructure(parse);
             List<TypedDependency> tdl = gs.typedDependenciesCCprocessed();
             System.out.println(tdl);
-            // for (TypedDependency td : tdl) {
-            // if (td.reln().getShortName().contains("subj")) {
-            // System.out.println(td);
-            //
-            // }
-            // if (td.reln().getShortName().contains("obj")) {
-            // System.out.println(td);
-            // }
-            // if (td.reln().getShortName().contains("root")) {
-            // System.out.println(td);
-            // }
-            // }
+            Tuple t = new Tuple();
+            for (TypedDependency td : tdl) {
+                if (td.reln().getShortName().contains("root")) {
+                    String pred = td.dep().toString();
+                    t.pred = pred;
+                }
+            }
+            for (TypedDependency td : tdl) {
+                if (td.reln().getShortName().contains("nsubj")) {
+                    String pred = td.gov().toString();
+                    if (pred.equals(t.pred))
+                        t.subj = td.dep().toString();
+                }
+                if (td.reln().getShortName().contains("dobj")) {
+                    String pred = td.gov().toString();
+                    if (pred.equals(t.pred))
+                        t.obj = td.dep().toString();
+                }
+            }
+            if (t.subj != null || t.obj != null) {
+                t.pred = t.pred.substring(0, t.pred.indexOf('-'));
+                if (t.subj != null)
+                    t.subj = t.subj.substring(0, t.subj.indexOf('-'));
+                if (t.obj != null)
+                    t.obj = t.obj.substring(0, t.obj.indexOf('-'));
+                tuples.add(t);
+            }
+            System.out.println(t);
         }
 
         return tuples;
