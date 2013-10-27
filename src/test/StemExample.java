@@ -16,7 +16,7 @@ public class StemExample {
         Properties props = new Properties();
         props.put("annotators", "tokenize, ssplit, pos, lemma");
         StanfordCoreNLP pipeline = new StanfordCoreNLP(props, false);
-        String text = "ran";/* the string you want */
+        String text = "ran";
 
         Annotation document = pipeline.process(text);
         for (CoreMap sentence : document.get(SentencesAnnotation.class)) {

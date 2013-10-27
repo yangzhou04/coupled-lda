@@ -3,20 +3,21 @@ package processor;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.Map;
 import java.util.Properties;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
 
-import edu.stanford.nlp.ling.CoreLabel;
+import util.Utils;
 import edu.stanford.nlp.ling.CoreAnnotations.LemmaAnnotation;
 import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
 import edu.stanford.nlp.ling.CoreAnnotations.TextAnnotation;
 import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
+import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 import edu.stanford.nlp.util.CoreMap;
-import util.Utils;
 
 public class MUC34DataPreprocessor {
 
@@ -43,24 +44,29 @@ public class MUC34DataPreprocessor {
     }
 
     public static void main(String[] args) throws IOException {
+        PrintWriter out = new PrintWriter("./test_out.txt");
         String text = Utils.read("./data/muc34-filtered/dev-muc3-0001-0100");
         // String[] words = content.split(" ");
         Map<String, Integer> wordMap = new TreeMap<String, Integer>();
-        // Pattern puncPat = Pattern.compile("[,.\"[]()]$");
 
         Properties props = new Properties();
         props.put("annotators", "tokenize, ssplit, pos, lemma");
         StanfordCoreNLP pipeline = new StanfordCoreNLP(props, false);
-        // String text = "ran";/* the string you want */
 
         Annotation document = pipeline.process(text);
         for (CoreMap sentence : document.get(SentencesAnnotation.class)) {
             for (CoreLabel token : sentence.get(TokensAnnotation.class)) {
-                String word = token.get(TextAnnotation.class);
-                System.out.print(word);
-                System.out.print(": ");
+                if (!token.tag().contains("NP") && !token.tag().contains("VB"))
+                    continue;
+                //String word = token.get(TextAnnotation.class);
+                //out.append(word);
+                //out.append(": ");
+                //out.append(token.tag());
+                //out.append(": ");
                 String lemma = token.get(LemmaAnnotation.class);
-                System.out.println(lemma);
+                //out.append(lemma);
+                //out.append("\n");
+
                 if (lemma.equals(""))
                     continue;
                 if (!wordMap.containsKey(lemma))
@@ -73,7 +79,9 @@ public class MUC34DataPreprocessor {
         }
 
         for (String key : wordMap.keySet()) {
-            System.out.println(key + ": " + wordMap.get(key));
+            out.append(key + ": " + wordMap.get(key));
+            out.append("\n");
         }
+        out.close();
     }
 }
