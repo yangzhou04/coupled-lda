@@ -16,6 +16,7 @@ lib/
 data/
 log/
 tmp/
+classifiers/
 
 
 # system files

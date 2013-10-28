@@ -43,7 +43,7 @@ import structure.SemanticRole;
 import flag.SemanticRoleType;
 
 /**
- * Modified from :Gibbs sampler for estimating the best assignments of topics
+ * Modified from :Gibbs sampler for estimating the best assignments of frames
  * for words and documents in a corpus. The algorithm is introduced in Tom
  * Griffiths' paper
  * "Gibbs sampling in the generative model of Latent Dirichlet Allocation"
@@ -79,35 +79,35 @@ public class Tlda {
     // private int VC;
 
     /**
-     * number of topics
+     * number of frames
      */
     private int K;
     /**
-     * Dirichlet parameter (document--topic associations)
+     * Dirichlet parameter (document--frame associations)
      */
     private double alpha;
     /**
-     * Dirichlet parameter (topic--term associations)
+     * Dirichlet parameter (frame--term associations)
      */
     private double beta;
 
     /**
-     * topic assignments for each word.
+     * frame assignments for each word.
      */
     private int z[][];
 
     /**
-     * cwt[i][j] number of instances of word i (term?) assigned to topic j.
+     * cwt[i][j] number of instances of word i (term?) assigned to frame j.
      */
     private int[][] nw;
 
     /**
-     * na[i][j] number of words in document i assigned to topic j.
+     * na[i][j] number of words in document i assigned to frame j.
      */
     private int[][] nd;
 
     /**
-     * nwsum[j] total number of words assigned to topic j.
+     * nwsum[j] total number of words assigned to frame j.
      */
     private int[] nwsum;
 
@@ -171,13 +171,13 @@ public class Tlda {
     }
 
     /**
-     * Initialisation: Must start with an assignment of observations to topics ?
+     * Initialisation: Must start with an assignment of observations to frames ?
      * Many alternatives are possible, I chose to perform random assignments
      * with equal probabilities
      * 
      * @param K
-     *            number of topics
-     * @return z assignment of topics to words
+     *            number of frames
+     * @return z assignment of frames to words
      */
     public void initialState(int K) {
         int M = documents.length;
@@ -202,14 +202,14 @@ public class Tlda {
                     continue;
                 }
 
-                int topic = (int) (Math.random() * K);
-                z[m][n] = topic;
-                // number of instances of word i assigned to topic j
-                nw[documents[m][n]][topic]++;
-                // number of words in document i assigned to topic j.
-                nd[m][topic]++;
-                // total number of words assigned to topic j.
-                nwsum[topic]++;
+                int frame = (int) (Math.random() * K);
+                z[m][n] = frame;
+                // number of instances of word i assigned to frame j
+                nw[documents[m][n]][frame]++;
+                // number of words in document i assigned to frame j.
+                nd[m][frame]++;
+                // total number of words assigned to frame j.
+                nwsum[frame]++;
             }
             // total number of words in document i
             ndsum[m] = N;
@@ -222,11 +222,11 @@ public class Tlda {
      * appropriate, output summary for each run.
      * 
      * @param K
-     *            number of topics
+     *            number of frames
      * @param alpha
-     *            symmetric prior parameter on document--topic associations
+     *            symmetric prior parameter on document--frame associations
      * @param beta
-     *            symmetric prior parameter on topic--term associations
+     *            symmetric prior parameter on frame--term associations
      */
     private void gibbs(int K, double alpha, double beta) {
         this.K = K;
@@ -257,8 +257,8 @@ public class Tlda {
                     }
                     // (z_i = z[m][n])
                     // sample from p(z_i|z_-i, w)
-                    int topic = sampleFullConditional(m, n);
-                    z[m][n] = topic;
+                    int frame = sampleFullConditional(m, n);
+                    z[m][n] = frame;
                 }
             }
 
@@ -282,7 +282,7 @@ public class Tlda {
     }
 
     /**
-     * Sample a topic z_i from the full conditional distribution: p(z_i = j |
+     * Sample a frame z_i from the full conditional distribution: p(z_i = j |
      * z_-i, w) = (n_-i,j(w_i) + beta)/(n_-i,j(.) + W * beta) * (n_-i,j(d_i) +
      * alpha)/(n_-i,.(d_i) + K * alpha)
      * 
@@ -294,10 +294,10 @@ public class Tlda {
     private int sampleFullConditional(int m, int n) {
 
         // remove z_i from the count variables
-        int topic = z[m][n];
-        nw[documents[m][n]][topic]--;
-        nd[m][topic]--;
-        nwsum[topic]--;
+        int frame = z[m][n];
+        nw[documents[m][n]][frame]--;
+        nd[m][frame]--;
+        nwsum[frame]--;
         ndsum[m]--;
 
         // do multinomial sampling via cumulative method:
@@ -312,18 +312,18 @@ public class Tlda {
         }
         // scaled sample because of unnormalised p[]
         double u = Math.random() * p[K - 1];
-        for (topic = 0; topic < p.length; topic++) {
-            if (u < p[topic])
+        for (frame = 0; frame < p.length; frame++) {
+            if (u < p[frame])
                 break;
         }
 
         // add newly estimated z_i to count variables
-        nw[documents[m][n]][topic]++;
-        nd[m][topic]++;
-        nwsum[topic]++;
+        nw[documents[m][n]][frame]++;
+        nd[m][frame]++;
+        nwsum[frame]++;
         ndsum[m]++;
 
-        return topic;
+        return frame;
     }
 
     /**
@@ -344,10 +344,10 @@ public class Tlda {
     }
 
     /**
-     * Retrieve estimated document--topic associations. If sample lag > 0 then
+     * Retrieve estimated document--frame associations. If sample lag > 0 then
      * the mean value of all sampled statistics for theta[][] is taken.
      * 
-     * @return theta multinomial mixture of document topics (M x K)
+     * @return theta multinomial mixture of document frames (M x K)
      */
     public double[][] getTheta() {
         double[][] theta = new double[documents.length][K];
@@ -371,10 +371,10 @@ public class Tlda {
     }
 
     /**
-     * Retrieve estimated topic--word associations. If sample lag > 0 then the
+     * Retrieve estimated frame--word associations. If sample lag > 0 then the
      * mean value of all sampled statistics for phi[][] is taken.
      * 
-     * @return phi multinomial mixture of topic words (K x V)
+     * @return phi multinomial mixture of frame words (K x V)
      */
     public double[][] getPhi() {
         double[][] phi = new double[K][V];
@@ -549,7 +549,7 @@ public class Tlda {
         int sampleLag = 10;
         lda.configure(iterations, burnIn, thinInterval, sampleLag);
 
-        int K = 13; // Frame number
+        int K = 6; // Frame number
         double alpha = 2; // good values
         double beta = .5; // good values
         lda.gibbs(K, alpha, beta);
@@ -559,7 +559,7 @@ public class Tlda {
 
         // System.out.println();
         // System.out.println();
-        // System.out.println("Document--Topic Associations, Theta[d][k] (alpha="
+        // System.out.println("Document--frame Associations, Theta[d][k] (alpha="
         // + alpha + ")");
         // System.out.print("d\\k\t");
         // for (int m = 0; m < theta[0].length; m++) {
@@ -575,7 +575,7 @@ public class Tlda {
         // System.out.println();
         // }
         // System.out.println();
-        // System.out.println("Topic--Term Associations, Phi[k][w] (beta=" +
+        // System.out.println("frame--Term Associations, Phi[k][w] (beta=" +
         // beta
         // + ")");
         //
