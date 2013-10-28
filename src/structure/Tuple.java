@@ -27,14 +27,18 @@ public class Tuple {
     }
 
     public Tuple(String subj, String obj, String pred, List<String> context) {
-        super();
+        this();
         this.subj = subj;
         this.obj = obj;
         this.pred = pred;
         this.context = context;
     }
 
-    public boolean valid() {
+    public Tuple(Tuple that) {
+        this(that.subj, that.obj, that.pred, null);
+    }
+
+    public boolean isValid() {
         return pred != null && (subj != null || obj != null);
     }
 
@@ -46,7 +50,6 @@ public class Tuple {
         sb.append(pred);
         sb.append("\t");
         sb.append(obj);
-        sb.append("\n");
         return sb.toString();
     }
 

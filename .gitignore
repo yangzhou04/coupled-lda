@@ -17,7 +17,7 @@ data/
 log/
 tmp/
 classifiers/
-
+visualization/
 
 # system files
 *~
