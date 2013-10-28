@@ -1,12 +1,16 @@
 package processor;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.FilenameFilter;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.io.InputStreamReader;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Pattern;
 
 import util.Utils;
@@ -19,12 +23,20 @@ import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
 import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
 import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.ling.HasWord;
+import edu.stanford.nlp.ling.TaggedWord;
 import edu.stanford.nlp.parser.lexparser.LexicalizedParser;
 import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.pipeline.StanfordCoreNLP;
+import edu.stanford.nlp.process.CoreLabelTokenFactory;
 import edu.stanford.nlp.process.DocumentPreprocessor;
+import edu.stanford.nlp.process.PTBTokenizer;
+import edu.stanford.nlp.process.TokenizerFactory;
+import edu.stanford.nlp.tagger.maxent.MaxentTagger;
+import edu.stanford.nlp.trees.GrammaticalStructure;
 import edu.stanford.nlp.trees.GrammaticalStructureFactory;
+import edu.stanford.nlp.trees.Tree;
 import edu.stanford.nlp.trees.TreebankLanguagePack;
+import edu.stanford.nlp.trees.TypedDependency;
 import edu.stanford.nlp.util.CoreMap;
 
 public class MUC34DataPreprocessor {
@@ -141,6 +153,44 @@ public class MUC34DataPreprocessor {
         File dirFile = new File(dir);
         File[] files = dirFile.listFiles(filenameFilter);
 
+        // find verbs
+        File verbFile = new File("./data/verbs.txt");
+        Set<String> verbs = new TreeSet<String>();
+
+        if (!verbFile.exists()) {
+            Properties props = new Properties();
+            props.put("annotators", "tokenize, ssplit, pos, lemma");
+            StanfordCoreNLP pipeline = new StanfordCoreNLP(props, false);
+
+            for (File file : files) {
+                Annotation document = pipeline.process(IOUtils.slurpFile(file));
+                for (CoreMap sentence : document.get(SentencesAnnotation.class)) {
+                    for (CoreLabel token : sentence.get(TokensAnnotation.class)) {
+                        if (token.tag().contains("VB")) {
+                            String lemma = token.get(LemmaAnnotation.class);
+                            if (!lemma.contains("lrb")
+                                    && !lemma.contains("rsb")
+                                    && !lemma.contains("rrb")) {
+                                verbs.add(lemma);
+                            }
+                        }
+                    }
+                }
+            }
+
+            StringBuilder sb = new StringBuilder();
+            for (String verb : verbs) {
+                sb.append(verb);
+                sb.append("\n");
+            }
+            Utils.write("./data/verbs.txt", sb.toString());
+        } else {
+            String[] verbArray = Utils.read(verbFile).split("\n");
+            for (int i = 0; i < verbArray.length; i++) {
+                verbs.add(verbArray[i]);
+            }
+        }
+
         String grammar = "edu/stanford/nlp/models/lexparser/englishPCFG.ser.gz";
         String[] options = { "-maxLength", "80", "-retainTmpSubcategories" };
         LexicalizedParser lp = LexicalizedParser.loadModel(grammar, options);
@@ -148,21 +198,32 @@ public class MUC34DataPreprocessor {
         GrammaticalStructureFactory gsf = tlp.grammaticalStructureFactory();
 
         for (File file : files) {
-            // String fileContents = IOUtils.slurpFile(file);
             StringBuilder sb = new StringBuilder();
-
             DocumentPreprocessor dp = new DocumentPreprocessor(new FileReader(
                     file));
-            Iterable<List<? extends HasWord>> sentences;
-            List<List<? extends HasWord>> tmp = new ArrayList<List<? extends HasWord>>();
             for (List<HasWord> sentence : dp) {
-                tmp.add(sentence);
-            }
-            sentences = tmp;
+                Tree parse = lp.parse(sentence);
+                GrammaticalStructure gs = gsf.newGrammaticalStructure(parse);
 
-            for (List<? extends HasWord> sentence : sentences) {
+                List<TypedDependency> tdl = gs.typedDependenciesCCprocessed();
+                // a sentence has only one root
+                TypedDependency root = GrammaticalStructure.getRoots(tdl)
+                        .iterator().next();
                 
+                for (int i = 0; i < tdl.size(); i++) {
+                    System.out.println(tdl.get(i));
+                    if (tdl.get(i).reln().toString().equals("nsubj")) {
+
+                    }
+                }
+
+                System.out.println(root);
+
+                // sb.append(GrammaticalStructure.getRoots(gs
+                // .typedDependenciesCCprocessed()));
+                // sb.append("\n");
             }
+
             Utils.write(new File("./data/muc34-tuple/", file.getName()),
                     sb.toString());
         }
@@ -170,43 +231,7 @@ public class MUC34DataPreprocessor {
 
     public static void main(String[] args) throws IOException {
         // neFilter();
-
-        lemmaFilter();
-
-        // do sentence dependency parsing to get subject and object of the verb
-        // String grammar = args.length > 0 ? args[0]
-        // : "edu/stanford/nlp/models/lexparser/englishPCFG.ser.gz";
-        // String[] options = { "-maxLength", "80", "-retainTmpSubcategories" };
-        // LexicalizedParser lp = LexicalizedParser.loadModel(grammar, options);
-        // TreebankLanguagePack tlp = lp.getOp().langpack();
-        // GrammaticalStructureFactory gsf = tlp.grammaticalStructureFactory();
-        //
-        // Iterable<List<? extends HasWord>> sentences;
-        // DocumentPreprocessor dp = new DocumentPreprocessor(
-        // "./data/muc34-beta/dev-muc3-0001-0100");
-        // List<List<? extends HasWord>> tmp = new ArrayList<List<? extends
-        // HasWord>>();
-        // for (List<HasWord> sentence : dp) {
-        // tmp.add(sentence);
-        // }
-        // sentences = tmp;
-        //
-        // for (List<? extends HasWord> sentence : sentences) {
-        // Tree parse = lp.parse(sentence);
-        //
-        // parse.pennPrint(out);
-        // GrammaticalStructure gs = gsf.newGrammaticalStructure(parse);
-        // Collection<TypedDependency> roots = GrammaticalStructure
-        // .getRoots(gs.typedDependenciesCCprocessed());
-        // out.append(roots.toString());
-        //
-        // // List<TypedDependency> tdl = gs.typedDependenciesCCprocessed();
-        // //
-        // // System.out.println(sentences);
-        // // for (TypedDependency td : tdl) {
-        // // System.out.println(td);
-        // // }
-        // }
-
+        // lemmaFilter();
+        svoFilter();
     }
 }
