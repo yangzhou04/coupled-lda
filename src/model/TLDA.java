@@ -30,8 +30,7 @@ import static util.Utils.read;
 
 import java.io.File;
 import java.io.IOException;
-import java.text.DecimalFormat;
-import java.text.NumberFormat;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -292,7 +291,6 @@ public class Tlda {
      *            word
      */
     private int sampleFullConditional(int m, int n) {
-
         // remove z_i from the count variables
         int frame = z[m][n];
         nw[documents[m][n]][frame]--;
@@ -395,47 +393,6 @@ public class Tlda {
     }
 
     /**
-     * Print table of multinomial data
-     * 
-     * @param data
-     *            vector of evidence
-     * @param fmax
-     *            max frequency in display
-     * @return the scaled histogram bin values
-     */
-    public static void hist(double[] data, int fmax) {
-
-        double[] hist = new double[data.length];
-        // scale maximum
-        double hmax = 0;
-        for (int i = 0; i < data.length; i++) {
-            hmax = Math.max(data[i], hmax);
-        }
-        double shrink = fmax / hmax;
-        for (int i = 0; i < data.length; i++) {
-            hist[i] = shrink * data[i];
-        }
-
-        NumberFormat nf = new DecimalFormat("00");
-        String scale = "";
-        for (int i = 1; i < fmax / 10 + 1; i++) {
-            scale += "    .    " + i % 10;
-        }
-
-        System.out.println("x" + nf.format(hmax / fmax) + "\t0" + scale);
-        for (int i = 0; i < hist.length; i++) {
-            System.out.print(i + "\t|");
-            for (int j = 0; j < Math.round(hist[i]); j++) {
-                if ((j + 1) % 10 == 0)
-                    System.out.print("]");
-                else
-                    System.out.print("|");
-            }
-            System.out.println();
-        }
-    }
-
-    /**
      * Configure the gibbs sampler
      * 
      * @param iterations
@@ -455,14 +412,15 @@ public class Tlda {
         SAMPLE_LAG = sampleLag;
     }
 
-    public void printTuple() {
+    public void printTuple(PrintWriter pw) {
         double[][] phi = getPhi();
         SemanticRoleType roleType;
         String word;
         double value;
         SemanticRole role;
+        pw.append("\n\n\n\n\n=============== Semantic Frames ============\n\n");
         for (int k = 0; k < K; k++) {
-            System.out.println("Frame " + k);
+            pw.append("========= Frame " + k + " ==========\n");
             List<SemanticRole> subjects = new LinkedList<SemanticRole>();
             List<SemanticRole> verbs = new LinkedList<SemanticRole>();
             List<SemanticRole> objects = new LinkedList<SemanticRole>();
@@ -485,41 +443,49 @@ public class Tlda {
             Collections.sort(verbs);
             Collections.sort(objects);
 
-            System.out.println("Subject:");
-            printSemanticRole(subjects);
-            System.out.println("Verb:");
-            printSemanticRole(verbs);
-            System.out.println("Object:");
-            printSemanticRole(objects);
+            pw.append("Subject:\n");
+            printSemanticRole(subjects, pw);
+            pw.append("Verb:\n");
+            printSemanticRole(verbs, pw);
+            pw.append("Object:\n");
+            printSemanticRole(objects, pw);
+            pw.append("\n");
         }
     }
 
-    private void printSemanticRole(List<SemanticRole> role) {
+    private void printSemanticRole(List<SemanticRole> role, PrintWriter pw) {
         for (int i = 0; i < role.size(); i++) {
-            System.out.print(role.get(i).getWord() + "  ");
+            pw.append(role.get(i).getWord() + ", ");
+            if (i % 20 == 0)
+                pw.append("\n");
         }
-        System.out.println();
+        pw.append("\n");
     }
 
-    public void printFrame() {
+    public void printFrame(PrintWriter pw) {
         double[][] theta = getTheta();
         double[][] phi = getPhi();
 
+        pw.append("=========== Document-Frame ============\n");
         for (int d = 0; d < documents.length; d++) {
+            pw.append("Document" + d + "\n");
             for (int k = 0; k < K; k++) {
-                System.out.print("Document" + d + " containing frame:" + k
-                        + ": ");
-                System.out.println(theta[d][k]);
+                pw.append("**Frame " + k + ": ");
+                pw.append(String.valueOf(theta[d][k]));
+                pw.append("\n");
             }
+            pw.append("\n\n");
         }
 
+        pw.append("===========Frame-Tuple ============\n");
+
         for (int k = 0; k < K; k++) {
-            System.out.println("Frame " + k);
+            pw.append("Frame " + k + "\n");
             for (int w = 0; w < V; w++) {
-                System.out.println(w + ": " + indexConventer.index2Word(w)
-                        + ": " + phi[k][w] + ": "
-                        + indexConventer.getRoleType(w));
+                pw.append(indexConventer.index2Word(w) + ": " + phi[k][w]
+                        + ": " + indexConventer.getRoleType(w) + "\n");
             }
+            pw.append("\n\n");
         }
     }
 
@@ -530,12 +496,11 @@ public class Tlda {
      * @throws IOException
      */
     public static void main(String[] args) throws IOException {
-
-        // Read tuple
-        final String dir = "data/tuples/";
+        // Read tuple "./data/muc34-tuple/";
+        final String dir = "./data/muc34-tuple/";
         List<Document> docs = new ArrayList<Document>();
-        File f = new File(dir);
-        for (String docLabel : f.list()) {
+        File dirFile = new File(dir);
+        for (String docLabel : dirFile.list()) {
             docs.add(new Document(docLabel, read(dir + docLabel)));
         }
 
@@ -549,52 +514,15 @@ public class Tlda {
         int sampleLag = 10;
         lda.configure(iterations, burnIn, thinInterval, sampleLag);
 
-        int K = 6; // Frame number
+        int K = 2; // Frame number
         double alpha = 2; // good values
         double beta = .5; // good values
         lda.gibbs(K, alpha, beta);
 
-        // double[][] theta = lda.getTheta();
-        // double[][] phi = lda.getPhi();
-
-        // System.out.println();
-        // System.out.println();
-        // System.out.println("Document--frame Associations, Theta[d][k] (alpha="
-        // + alpha + ")");
-        // System.out.print("d\\k\t");
-        // for (int m = 0; m < theta[0].length; m++) {
-        // System.out.print("   " + m % 10 + "    ");
-        // }
-        // System.out.println();
-        // for (int m = 0; m < theta.length; m++) {
-        // System.out.print(m + "\t");
-        // for (int k = 0; k < theta[m].length; k++) {
-        // System.out.print(theta[m][k] + " ");
-        // // System.out.print(shadeDouble(theta[m][k], 1) + " ");
-        // }
-        // System.out.println();
-        // }
-        // System.out.println();
-        // System.out.println("frame--Term Associations, Phi[k][w] (beta=" +
-        // beta
-        // + ")");
-        //
-        // System.out.print("k\\w\t");
-        // for (int w = 0; w < phi[0].length; w++) {
-        // System.out.print("   " + w + "    ");
-        // }
-        // System.out.println();
-        // for (int k = 0; k < phi.length; k++) {
-        // System.out.print(k + "\t");
-        // for (int w = 0; w < phi[k].length; w++) {
-        // System.out.print(phi[k][w] + " ");
-        // // System.out.print(shadeDouble(phi[k][w], 1) + " ");
-        // }
-        // System.out.println();
-        // }
-
-        lda.printFrame();
-        lda.printTuple();
+        PrintWriter pw = new PrintWriter("./data/tuples.txt");
+        lda.printFrame(pw);
+        lda.printTuple(pw);
+        pw.close();
     }
 
 }

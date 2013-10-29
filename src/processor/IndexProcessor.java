@@ -1,11 +1,9 @@
 package processor;
 
-import static util.Utils.read;
 import static util.Utils.write;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -56,9 +54,9 @@ public class IndexProcessor {
 
     public int[][] mapping(List<Document> documents) throws IOException {
         StringBuffer sb = new StringBuffer();
-        // String to int mapping
+        // map word to int
         int[][] mapped = new int[documents.size()][];
-        tupleCount = 0;// statistic tuple count
+        tupleCount = 0;
 
         for (int d = 0; d < documents.size(); d++) {
             Document doc = documents.get(d);
@@ -106,6 +104,9 @@ public class IndexProcessor {
             for (int k = 0; k < tmp.size(); k++) {
                 mapped[d][k] = tmp.get(k);
             }
+
+            // deal with tuple without specific semantic role.
+            word2Int.put("null", index);
 
             write("data/exper.mappedtuples/" + doc.getLabel(), sb.toString());
             sb.delete(0, sb.length());
@@ -196,17 +197,17 @@ public class IndexProcessor {
     }
 
     public static void main(String[] args) throws IOException {
-        IndexProcessor c = IndexProcessor.getInstance();
-
-        String folder = "data/exper.tuples/";
-
-        List<Document> documents = new ArrayList<Document>();
-        File f = new File(folder);
-        for (String fn : f.list()) {
-            documents.add(new Document(fn, read(folder + fn)));
-        }
-        c.mapping(documents);
-        c.save("./data/mapping");
+        // IndexProcessor c = IndexProcessor.getInstance();
+        //
+        // String folder = "data/exper.tuples/";
+        //
+        // List<Document> documents = new ArrayList<Document>();
+        // File f = new File(folder);
+        // for (String fn : f.list()) {
+        // documents.add(new Document(fn, read(folder + fn)));
+        // }
+        // c.mapping(documents);
+        // c.save("./data/mapping");
     }
 
 }
