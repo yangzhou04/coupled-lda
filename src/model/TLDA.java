@@ -514,7 +514,7 @@ public class Tlda {
         int sampleLag = 10;
         lda.configure(iterations, burnIn, thinInterval, sampleLag);
 
-        int K = 2; // Frame number
+        int K = 6; // Frame number
         double alpha = 2; // good values
         double beta = .5; // good values
         lda.gibbs(K, alpha, beta);
