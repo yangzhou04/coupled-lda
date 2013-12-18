@@ -1,31 +1,5 @@
 package model;
 
-/*
- * (C) Copyright 2005, Gregor Heinrich (gregor :: arbylon : net) (This file is
- * part of the org.knowceans experimental software packages.)
- */
-/*
- * LdaGibbsSampler is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation; either version 2 of the License, or (at your option) any
- * later version.
- */
-/*
- * LdaGibbsSampler is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
- * details.
- */
-/*
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
- * Place, Suite 330, Boston, MA 02111-1307 USA
- */
-
-/*
- * Created on Mar 6, 2005
- */
-
 import static util.Utils.read;
 
 import java.io.File;
@@ -40,16 +14,6 @@ import processor.IndexProcessor;
 import structure.Document;
 import structure.SemanticRole;
 import flag.SemanticRoleType;
-
-/**
- * Modified from :Gibbs sampler for estimating the best assignments of frames
- * for words and documents in a corpus. The algorithm is introduced in Tom
- * Griffiths' paper
- * "Gibbs sampling in the generative model of Latent Dirichlet Allocation"
- * (2002). origin author: Gregor Heinrich
- * 
- * @author zhouyang
- */
 
 public class Tlda {
 
@@ -195,20 +159,17 @@ public class Tlda {
             int N = documents[m].length;
             z[m] = new int[N];
             for (int n = 0; n < N; n++) {
-                if (indexConventer.getNullIndex() == documents[m][n]) { // ignore
-                                                                        // null
-                                                                        // role
-                    continue;
+                // ignore null role
+                if (indexConventer.getNullIndex() != documents[m][n]) {
+                    int frame = (int) (Math.random() * K);
+                    z[m][n] = frame;
+                    // number of instances of word i assigned to frame j
+                    nw[documents[m][n]][frame]++;
+                    // number of words in document i assigned to frame j.
+                    nd[m][frame]++;
+                    // total number of words assigned to frame j.
+                    nwsum[frame]++;
                 }
-
-                int frame = (int) (Math.random() * K);
-                z[m][n] = frame;
-                // number of instances of word i assigned to frame j
-                nw[documents[m][n]][frame]++;
-                // number of words in document i assigned to frame j.
-                nd[m][frame]++;
-                // total number of words assigned to frame j.
-                nwsum[frame]++;
             }
             // total number of words in document i
             ndsum[m] = N;
