@@ -6,14 +6,10 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedList;
 import java.util.List;
 
-import processor.IndexProcessor;
+import processor.Indexr;
 import structure.Document;
-import structure.SemanticRole;
-import flag.SemanticRoleType;
 
 public class Tlda {
 
@@ -22,7 +18,7 @@ public class Tlda {
      */
     private int[][] documents;
 
-    private IndexProcessor indexConventer;
+    private Indexr indexer;
 
     /**
      * vocabulary size
@@ -31,15 +27,15 @@ public class Tlda {
     /**
      * Subject count
      */
-    // private int SC;
+    private int S;
     /**
      * Object count
      */
-    // private int OC;
+    private int O;
     /**
-     * Verb count
+     * Predicate count
      */
-    // private int VC;
+    private int P;
 
     /**
      * number of frames
@@ -50,37 +46,71 @@ public class Tlda {
      */
     private double alpha;
     /**
-     * Dirichlet parameter (frame--term associations)
+     * Dirichlet parameter (frame--subject, predicate, 
+     * object associations respectively)
      */
     private double beta;
+    private double delta;
+    private double gamma;
 
     /**
      * frame assignments for each word.
      */
-    private int z[][];
+    // private int[][] z;
+    
+    // frame assignments for each subject.
+    private int[][] s;
+    // frame assignments for each predicate.
+    private int[][] p;
+    // frame assignments for each object.
+    private int[][] o;
 
     /**
      * cwt[i][j] number of instances of word i (term?) assigned to frame j.
      */
     private int[][] nw;
+    // number of instances of subject i assigned to frame j
+    private int[][] ns;
+    // number of instances of predicate i assigned to frame j
+    private int[][] np;
+    // number of instances of object i assigned to frame j
+    private int[][] no;
 
     /**
      * na[i][j] number of words in document i assigned to frame j.
      */
     private int[][] nd;
+    // number of subjects in document i assigned to frame j.
+    private int[][] nds;
+    // number of predicates in document i assigned to frame j.
+    private int[][] ndp;
+    // number of objects in document i assigned to frame j.
+    private int[][] ndo;
 
     /**
      * nwsum[j] total number of words assigned to frame j.
      */
     private int[] nwsum;
+    // total number of subjects assigned to frame j
+    private int[] nssum;
+    // total number of predicates assigned to frame j
+    private int[] npsum;
+    // total number of objects assigned to frame j
+    private int[] nosum;
 
     /**
      * nasum[i] total number of words in document i.
      */
     private int[] ndsum;
+    // total number of subjects in document i.
+    private int[] ndssum;
+    // total number of predicates in document i.
+    private int[] ndpsum;
+    // total number of objects in document i.
+    private int[] ndosum;
 
     /**
-     * cumulative statistics of theta
+     * cumulative statistics of theta, delta, gamma
      */
     private double[][] thetasum;
 
@@ -88,6 +118,8 @@ public class Tlda {
      * cumulative statistics of phi
      */
     private double[][] phisum;
+    private double[][] zetasum;
+    private double[][] psisum;
 
     /**
      * size of statistics
@@ -97,40 +129,32 @@ public class Tlda {
     /**
      * sampling lag (?)
      */
-    private static int THIN_INTERVAL = 20;
+    private int THIN_INTERVAL = 20;
 
     /**
      * burn-in period
      */
-    private static int BURN_IN = 100;
+    private int BURN_IN = 100;
 
     /**
      * max iterations
      */
-    private static int ITERATIONS = 1000;
+    private int ITERATIONS = 1000;
 
     /**
      * sample lag (if -1 only one sample taken)
      */
-    private static int SAMPLE_LAG;
+    private int SAMPLE_LAG;
 
     // private static int dispcol = 0;
 
     public Tlda(List<Document> docs) throws IOException {
-
-        this.indexConventer = IndexProcessor.getInstance();
-        int[][] indexedDocs = indexConventer.mapping(docs);
-        int V = indexConventer.getVocabulary();
-        // int WC = ic.getWordCount();
-        // int SC = ic.getSubjectCount();
-        // int OC = ic.getObjectCount();
-        // int VC = ic.getVerbCount();
-
-        this.documents = indexedDocs;
-        this.V = V;
-        // this.SC = SC;
-        // this.VC = VC;
-        // this.OC = OC;
+        this.indexer = Indexr.getInstance();
+        this.documents = indexer.doIndex(docs);
+        this.V = indexer.getVocabularySize();
+        this.S = indexer.getSubjectSize();
+        this.P = indexer.getPredicateCount();
+        this.O = indexer.getObjectCount();
     }
 
     /**
@@ -146,33 +170,71 @@ public class Tlda {
         int M = documents.length;
 
         // initialise count variables.
-        nw = new int[V][K];
-        nd = new int[M][K];
-        nwsum = new int[K];
-        ndsum = new int[M];
+//        nw = new int[V][K];
+//        nd = new int[M][K];
+//        nwsum = new int[K];
+//        ndsum = new int[M];
+        
+        ns = new int[V][K];
+        np = new int[V][K];
+        no = new int[V][K];
+        nds = new int[M][K];
+        ndp = new int[M][K];
+        ndo = new int[M][K];
+        nssum = new int[K];
+        npsum = new int[K];
+        nosum = new int[K];
+        ndssum = new int[M];
+        ndpsum = new int[M];
+        ndosum = new int[M];
 
         // The z_i are are initialised to values in [1,K] to determine the
         // initial state of the Markov chain.
 
-        z = new int[M][];
+//        z = new int[M][];
+        s = new int[M][];
+        p = new int[M][];
+        o = new int[M][];
         for (int m = 0; m < M; m++) {
-            int N = documents[m].length;
-            z[m] = new int[N];
+            // every tuple contains 3 elements.
+            int N = documents[m].length / 3;
+            
+//            z[m] = new int[N];
+            s[m] = new int[N];
+            p[m] = new int[N];
+            o[m] = new int[N];
             for (int n = 0; n < N; n++) {
-                // ignore null role
-                if (indexConventer.getNullIndex() != documents[m][n]) {
-                    int frame = (int) (Math.random() * K);
-                    z[m][n] = frame;
-                    // number of instances of word i assigned to frame j
-                    nw[documents[m][n]][frame]++;
-                    // number of words in document i assigned to frame j.
-                    nd[m][frame]++;
-                    // total number of words assigned to frame j.
-                    nwsum[frame]++;
-                }
+                int f = (int) (Math.random() * K);
+                // z[m][n] = frame;
+                // number of instances of word i assigned to frame j
+//                nw[documents[m][n]][frame]++;
+                // number of words in document i assigned to frame j.
+//                nd[m][frame]++;
+                // total number of words assigned to frame j.
+//                nwsum[frame]++;
+                
+                // assign frame to SPO
+                s[m][n] = f;
+                p[m][n] = f;
+                o[m][n] = f;
+                // number of instances of SPOs assigned to frame
+                ns[documents[m][n*3]][f]++;
+                np[documents[m][n*3+1]][f]++;
+                no[documents[m][n*3+2]][f]++;
+                // number of SPOs in document m assigned to frame f
+                nds[m][f]++;
+                ndp[m][f]++;
+                ndo[m][f]++;
+                // total number of SPOs assigned to frame
+                nssum[f]++;
+                npsum[f]++;
+                nosum[f]++;
             }
             // total number of words in document i
-            ndsum[m] = N;
+            // ndsum[m] = N;
+            ndssum[m] = N;
+            ndpsum[m] = N;
+            ndosum[m] = N;
         }
     }
 
@@ -188,15 +250,19 @@ public class Tlda {
      * @param beta
      *            symmetric prior parameter on frame--term associations
      */
-    private void gibbs(int K, double alpha, double beta) {
+    private void gibbs(int K, double alpha, double beta, double delta, double gamma) {
         this.K = K;
         this.alpha = alpha;
         this.beta = beta;
+        this.delta = delta;
+        this.gamma = gamma;
 
         // init sampler statistics
         if (SAMPLE_LAG > 0) {
             thetasum = new double[documents.length][K];
             phisum = new double[K][V];
+            psisum = new double[K][V];
+            zetasum = new double[K][V];
             numstats = 0;
         }
 
@@ -208,62 +274,54 @@ public class Tlda {
                 + THIN_INTERVAL + ").");
 
         for (int i = 0; i < ITERATIONS; i++) {
-
             // for all z_i
-            for (int m = 0; m < z.length; m++) {
-                for (int n = 0; n < z[m].length; n++) {
-                    if (indexConventer.getNullIndex() == documents[m][n]) {
-                        continue;
-                    }
-                    // (z_i = z[m][n])
-                    // sample from p(z_i|z_-i, w)
-                    int frame = sampleFullConditional(m, n);
-                    z[m][n] = frame;
-                }
-            }
+//            for (int m = 0; m < z.length; m++) {
+//                for (int n = 0; n < z[m].length; n++) {
+//                    // (z_i = z[m][n])
+//                    // sample from p(z_i|z_-i, w)
+//                    int frame = sampleFullConditional(m, n);
+//                    z[m][n] = frame;
+//                }
+//            }
 
-            /*
-             * if ((i < BURN_IN) && (i % THIN_INTERVAL == 0)) {
-             * System.out.print("B"); dispcol++; } // display progress if ((i >
-             * BURN_IN) && (i % THIN_INTERVAL == 0)) { System.out.print("S");
-             * dispcol++; }
-             */
+            // the full conditional is the same, but the statistical matrix 
+            // used is different, so separate them into 3 function
+            
+            // sample frame for subjects
+            for (int m = 0; m < s.length; m++)
+                for (int n = 0; n < s[m].length; n++)
+                    s[m][n] = sampleSubjectFullConditional(m, n);
+            // sample frame for predicates
+            for (int m = 0; m < p.length; m++)
+                for (int n = 0; n < p[m].length; n++)
+                    p[m][n] = samplePredicateFullConditional(m, n);
+            // sample frame for objects
+            for (int m = 0; m < o.length; m++)
+                for (int n = 0; n < o[m].length; n++)
+                    o[m][n] = sampleObjectFullConditional(m, n);
+
             // get statistics after burn-in
             if ((i > BURN_IN) && (SAMPLE_LAG > 0) && (i % SAMPLE_LAG == 0)) {
                 updateParams();
-                // System.out.print("|");
-                // if (i % THIN_INTERVAL != 0)
-                // dispcol++;
             }
-            /*
-             * if (dispcol >= 100) { System.out.println(); dispcol = 0; }
-             */
         }
     }
 
-    /**
-     * Sample a frame z_i from the full conditional distribution: p(z_i = j |
-     * z_-i, w) = (n_-i,j(w_i) + beta)/(n_-i,j(.) + W * beta) * (n_-i,j(d_i) +
-     * alpha)/(n_-i,.(d_i) + K * alpha)
-     * 
-     * @param m
-     *            document
-     * @param n
-     *            word
-     */
-    private int sampleFullConditional(int m, int n) {
-        // remove z_i from the count variables
-        int frame = z[m][n];
-        nw[documents[m][n]][frame]--;
-        nd[m][frame]--;
-        nwsum[frame]--;
-        ndsum[m]--;
+    private int sampleSubjectFullConditional(int m, int n) {
+        // remove f_i from the count variables
+        int f = s[m][n];
+        ns[documents[m][n*3]][f]--; // mapping position
+        nds[m][f]--;
+        nssum[f]--;
+        ndssum[m]--;
 
         // do multinomial sampling via cumulative method:
         double[] p = new double[K];
         for (int k = 0; k < K; k++) {
-            p[k] = (nw[documents[m][n]][k] + beta) / (nwsum[k] + V * beta)
-                    * (nd[m][k] + alpha) / (ndsum[m] + K * alpha);
+            p[k] = (no[documents[m][n*3+2]][k] + beta) / (nosum[k] + O * beta)
+                * (ns[documents[m][n*3]][k] + gamma) / (nosum[k] + S * gamma)
+                * (np[documents[m][n*3+1]][k] + delta) / (npsum[k] + P * delta)
+* (nds[m][k]+ndp[m][k]+ndo[m][k] + alpha) / (ndssum[m]+ndpsum[m]+ndosum[m] + K * alpha);
         }
         // cumulate multinomial parameters
         for (int k = 1; k < p.length; k++) {
@@ -271,18 +329,90 @@ public class Tlda {
         }
         // scaled sample because of unnormalised p[]
         double u = Math.random() * p[K - 1];
-        for (frame = 0; frame < p.length; frame++) {
-            if (u < p[frame])
+        for (f = 0; f < p.length; f++) {
+            if (u < p[f])
                 break;
         }
 
         // add newly estimated z_i to count variables
-        nw[documents[m][n]][frame]++;
-        nd[m][frame]++;
-        nwsum[frame]++;
-        ndsum[m]++;
+        ns[documents[m][n*3]][f]++; // mapping position
+        nds[m][f]++;
+        nssum[f]++;
+        ndssum[m]++;
 
-        return frame;
+        return f;
+    }
+    
+    private int samplePredicateFullConditional(int m, int n) {
+        // remove f_i from the count variables
+        int f = p[m][n];
+        np[documents[m][n*3+1]][f]--; // mapping position
+        ndp[m][f]--;
+        npsum[f]--;
+        ndpsum[m]--;
+
+        // do multinomial sampling via cumulative method:
+        double[] p = new double[K];
+        for (int k = 0; k < K; k++) {
+            p[k] = (no[documents[m][n*3+2]][k] + beta) / (nosum[k] + O * beta)
+                * (ns[documents[m][n*3]][k] + gamma) / (nosum[k] + S * gamma)
+                * (np[documents[m][n*3+1]][k] + delta) / (npsum[k] + P * delta)
+* (nds[m][k]+ndp[m][k]+ndo[m][k] + alpha) / (ndssum[m]+ndpsum[m]+ndosum[m] + K * alpha);
+        }
+        // cumulate multinomial parameters
+        for (int k = 1; k < p.length; k++) {
+            p[k] += p[k - 1];
+        }
+        // scaled sample because of unnormalised p[]
+        double u = Math.random() * p[K - 1];
+        for (f = 0; f < p.length; f++) {
+            if (u < p[f])
+                break;
+        }
+
+        // add newly estimated z_i to count variables
+        np[documents[m][n*3+1]][f]++; // mapping position
+        ndp[m][f]++;
+        npsum[f]++;
+        ndpsum[m]++;
+
+        return f;
+    }
+    
+    private int sampleObjectFullConditional(int m, int n) {
+        // remove f_i from the count variables
+        int f = o[m][n];
+        no[documents[m][n*3+2]][f]--; // mapping position
+        ndo[m][f]--;
+        nosum[f]--;
+        ndosum[m]--;
+
+        // do multinomial sampling via cumulative method:
+        double[] p = new double[K];
+        for (int k = 0; k < K; k++) {
+            p[k] = (no[documents[m][n*3+2]][k] + beta) / (nosum[k] + O * beta)
+                * (ns[documents[m][n*3]][k] + gamma) / (nosum[k] + S * gamma)
+                * (np[documents[m][n*3+1]][k] + delta) / (npsum[k] + P * delta)
+* (nds[m][k]+ndp[m][k]+ndo[m][k] + alpha) / (ndssum[m]+ndpsum[m]+ndosum[m] + K * alpha);
+        }
+        // cumulate multinomial parameters
+        for (int k = 1; k < p.length; k++) {
+            p[k] += p[k - 1];
+        }
+        // scaled sample because of unnormalised p[]
+        double u = Math.random() * p[K - 1];
+        for (f = 0; f < p.length; f++) {
+            if (u < p[f])
+                break;
+        }
+
+        // add newly estimated z_i to count variables
+        no[documents[m][n*3+2]][f]++; // mapping position
+        ndo[m][f]++;
+        nosum[f]++;
+        ndosum[m]++;
+
+        return f;
     }
 
     /**
@@ -291,12 +421,15 @@ public class Tlda {
     private void updateParams() {
         for (int m = 0; m < documents.length; m++) {
             for (int k = 0; k < K; k++) {
-                thetasum[m][k] += (nd[m][k] + alpha) / (ndsum[m] + K * alpha);
+                thetasum[m][k] += (nds[m][k]+ndp[m][k]+ndo[m][k] + alpha) 
+                        / (ndssum[m]+ndpsum[m]+ndosum[m] + K * alpha);
             }
         }
         for (int k = 0; k < K; k++) {
             for (int w = 0; w < V; w++) {
-                phisum[k][w] += (nw[w][k] + beta) / (nwsum[k] + V * beta);
+                phisum[k][w] += (no[w][k] + beta) / (nosum[k] + O * beta);
+                zetasum[k][w] += (np[w][k] + delta) / (npsum[k] + P * delta);
+                psisum[k][w] += (ns[w][k] + gamma) / (nssum[k] + S * gamma);
             }
         }
         numstats++;
@@ -317,7 +450,6 @@ public class Tlda {
                     theta[m][k] = thetasum[m][k] / numstats;
                 }
             }
-
         } else {
             for (int m = 0; m < documents.length; m++) {
                 for (int k = 0; k < K; k++) {
@@ -328,6 +460,8 @@ public class Tlda {
 
         return theta;
     }
+    
+    
 
     /**
      * Retrieve estimated frame--word associations. If sample lag > 0 then the
@@ -352,6 +486,42 @@ public class Tlda {
         }
         return phi;
     }
+    
+    public double[][] getZeta() {
+        double[][] zeta = new double[K][V];
+        if (SAMPLE_LAG > 0) {
+            for (int k = 0; k < K; k++) {
+                for (int w = 0; w < V; w++) {
+                    zeta[k][w] = zetasum[k][w] / numstats;
+                }
+            }
+        } else {
+            for (int k = 0; k < K; k++) {
+                for (int w = 0; w < V; w++) {
+                    zeta[k][w] = (np[w][k] + delta) / (npsum[k] + P * delta);
+                }
+            }
+        }
+        return zeta;
+    }
+    
+    public double[][] getPsi() {
+        double[][] psi = new double[K][V];
+        if (SAMPLE_LAG > 0) {
+            for (int k = 0; k < K; k++) {
+                for (int w = 0; w < V; w++) {
+                    psi[k][w] = psisum[k][w] / numstats;
+                }
+            }
+        } else {
+            for (int k = 0; k < K; k++) {
+                for (int w = 0; w < V; w++) {
+                    psi[k][w] = (ns[w][k] + beta) / (nssum[k] + S * beta);
+                }
+            }
+        }
+        return psi;
+    }
 
     /**
      * Configure the gibbs sampler
@@ -367,67 +537,19 @@ public class Tlda {
      */
     public void configure(int iterations, int burnIn, int thinInterval,
             int sampleLag) {
-        ITERATIONS = iterations;
-        BURN_IN = burnIn;
-        THIN_INTERVAL = thinInterval;
-        SAMPLE_LAG = sampleLag;
+        this.ITERATIONS = iterations;
+        this.BURN_IN = burnIn;
+        this.THIN_INTERVAL = thinInterval;
+        this.SAMPLE_LAG = sampleLag;
     }
 
-    public void printTuple(PrintWriter pw) {
-        double[][] phi = getPhi();
-        SemanticRoleType roleType;
-        String word;
-        double value;
-        SemanticRole role;
-        pw.append("\n\n\n\n\n=============== Semantic Frames ============\n\n");
-        for (int k = 0; k < K; k++) {
-            pw.append("========= Frame " + k + " ==========\n");
-            List<SemanticRole> subjects = new LinkedList<SemanticRole>();
-            List<SemanticRole> verbs = new LinkedList<SemanticRole>();
-            List<SemanticRole> objects = new LinkedList<SemanticRole>();
-            for (int w = 0; w < V; w++) {
-                roleType = indexConventer.getRoleType(w);
-                word = indexConventer.index2Word(w);
-                value = phi[k][w];
-                role = new SemanticRole(roleType, word, value);
-                if (roleType == SemanticRoleType.SUBJECT) {
-                    subjects.add(role);
-                } else if (roleType == SemanticRoleType.PREDICATE) {
-                    verbs.add(role);
-                } else {
-                    objects.add(role);
-                }
-                // System.out.println(w + ": " + ic.index2Word(w) + ": "
-                // + phi[k][w] + ": " + role);
-            }
-            Collections.sort(subjects);
-            Collections.sort(verbs);
-            Collections.sort(objects);
-
-            pw.append("Subject:\n");
-            printSemanticRole(subjects, pw);
-            pw.append("Verb:\n");
-            printSemanticRole(verbs, pw);
-            pw.append("Object:\n");
-            printSemanticRole(objects, pw);
-            pw.append("\n");
-        }
-    }
-
-    private void printSemanticRole(List<SemanticRole> role, PrintWriter pw) {
-        for (int i = 0; i < role.size(); i++) {
-            pw.append(role.get(i).getWord() + ", ");
-            if (i % 20 == 0)
-                pw.append("\n");
-        }
-        pw.append("\n");
-    }
-
-    public void printFrame(PrintWriter pw) {
+    public void printDistributions(PrintWriter pw) {
         double[][] theta = getTheta();
         double[][] phi = getPhi();
+        double[][] zeta = getZeta();
+        double[][] psi = getPsi();
 
-        pw.append("=========== Document-Frame ============\n");
+        pw.append("=========== Document-Frame distribution============\n");
         for (int d = 0; d < documents.length; d++) {
             pw.append("Document" + d + "\n");
             for (int k = 0; k < K; k++) {
@@ -438,16 +560,26 @@ public class Tlda {
             pw.append("\n\n");
         }
 
-        pw.append("===========Frame-Tuple ============\n");
-
+        pw.append("===========Frame-SR distribution============\n");
         for (int k = 0; k < K; k++) {
-            pw.append("Frame " + k + "\n");
+            pw.append("***Frame " + k + "***\n");
+            
+            pw.append("**subject**\n");
             for (int w = 0; w < V; w++) {
-                pw.append(indexConventer.index2Word(w) + ": " + phi[k][w]
-                        + ": " + indexConventer.getRoleType(w) + "\n");
+                pw.append(indexer.index2Word(w) + ": " + psi[k][w] + "\n");
             }
+            pw.append("**predicate**\n");
+            for (int w = 0; w < V; w++) {
+                pw.append(indexer.index2Word(w) + ": " + zeta[k][w] + "\n");
+            }
+            pw.append("**object**\n");
+            for (int w = 0; w < V; w++) {
+                pw.append(indexer.index2Word(w) + ": " + phi[k][w] + "\n");
+            }
+            
             pw.append("\n\n");
         }
+
     }
 
     /**
@@ -458,7 +590,7 @@ public class Tlda {
      */
     public static void main(String[] args) throws IOException {
         // Read tuple "./data/muc34-tuple/";
-        final String dir = "./data/muc34-tuple/";
+        final String dir = "./data/artificial/";
         List<Document> docs = new ArrayList<Document>();
         File dirFile = new File(dir);
         for (String docLabel : dirFile.list()) {
@@ -475,14 +607,16 @@ public class Tlda {
         int sampleLag = 10;
         lda.configure(iterations, burnIn, thinInterval, sampleLag);
 
-        int K = 6; // Frame number
+        int K = 4; // Frame number
         double alpha = 2; // good values
-        double beta = .5; // good values
-        lda.gibbs(K, alpha, beta);
+        double beta = .05; // good values
+        double delta = .05; // good values
+        double gamma = .05; // good values
+        lda.gibbs(K, alpha, beta, delta, gamma);
 
-        PrintWriter pw = new PrintWriter("./data/tuples.txt");
-        lda.printFrame(pw);
-        lda.printTuple(pw);
+        PrintWriter pw = new PrintWriter("./data/artificial_tuples.txt");
+        lda.printDistributions(pw);
+//        lda.printTuple(pw);
         pw.close();
     }
 

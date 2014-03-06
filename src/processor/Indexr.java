@@ -19,11 +19,14 @@ import flag.SemanticRoleType;
  * @author Yang Zhou
  * 
  */
-public class IndexProcessor {
+public class Indexr {
     /**
      * Mapping word to int
      */
     private Map<String, Integer> word2Int;
+    private Map<String, Integer> subject2Int;
+    private Map<String, Integer> predicate2Int;
+    private Map<String, Integer> object2Int;
     /**
      * Mapping int back to word
      */
@@ -32,45 +35,57 @@ public class IndexProcessor {
      * Mapping
      */
     private Map<Integer, SemanticRoleType> int2Role;
-    private int index = 0;
+//    private int index = 0;
     private int tupleCount;
-    private int subjectCount;
-    private int verbCount;
-    private int objectCount;
+//    private int subjectCount;
+//    private int predicateCount;
+//    private int objectCount;
 
     static class ConventerHolder {
-        static IndexProcessor instance = new IndexProcessor();
+        static Indexr instance = new Indexr();
     }
 
-    private IndexProcessor() {
+    private Indexr() {
         word2Int = new HashMap<String, Integer>();
+        subject2Int =new HashMap<String, Integer>(); 
+        predicate2Int =new HashMap<String, Integer>();
+        object2Int =new HashMap<String, Integer>();
         int2Word = new HashMap<Integer, String>();
         int2Role = new HashMap<Integer, SemanticRoleType>();
     }
 
-    public static IndexProcessor getInstance() {
+    public static Indexr getInstance() {
         return ConventerHolder.instance;
     }
 
-    public int[][] mapping(List<Document> documents) throws IOException {
-        StringBuffer sb = new StringBuffer();
+    public int[][] doIndex(List<Document> corpus) throws IOException {
         // map word to int
-        int[][] mapped = new int[documents.size()][];
+        int[][] indexedCorpus = new int[corpus.size()][];
         tupleCount = 0;
 
-        for (int d = 0; d < documents.size(); d++) {
-            Document doc = documents.get(d);
+        // deal with tuple without specific semantic role.
+        word2Int.put("null", 0);
+        subject2Int.put("null", 0);
+        predicate2Int.put("null", 0);
+        object2Int.put("null", 0);
+        int index=0,sindex=0, pindex=0, oindex=0;
+        for (int d = 0; d < corpus.size(); d++) {
+            Document doc = corpus.get(d);
             // Separate file into tuples
             StringTokenizer st = new StringTokenizer(doc.getContent(), "\n");
             tupleCount += st.countTokens();
-            List<Integer> tmp = new LinkedList<Integer>();
+            List<Integer> indexBuf = new LinkedList<Integer>();
             while (st.hasMoreTokens()) {
                 String line = st.nextToken();
                 // Separate a tuple into SVO
                 StringTokenizer st2 = new StringTokenizer(line, "\t");
-                int tokenidx = 0;
+                if (st2.countTokens() != 3) {
+                    System.err.println("Input data format error. Please check!");
+                    System.exit(-1);
+                }
+                int pos = 0;
                 while (st2.hasMoreTokens()) {
-                    String k = st2.nextToken();
+                    String k = st2.nextToken().trim();
                     // System.out.println(tokenidx + ": " + k);
                     // if (k.compareTo("null") == 0) {
                     // tokenidx++;
@@ -78,40 +93,40 @@ public class IndexProcessor {
                     // }
                     // if find a new word
                     if (!word2Int.containsKey(k)) {
-                        word2Int.put(k, index);
-                        int2Word.put(index, k);
-                        // statistic SVO count
-                        if (tokenidx % 3 == 0) {
-                            subjectCount++;
-                            int2Role.put(index, SemanticRoleType.SUBJECT);
-                        } else if (tokenidx % 3 == 1) {
-                            verbCount++;
-                            int2Role.put(index, SemanticRoleType.PREDICATE);
-                        } else {
-                            objectCount++;
-                            int2Role.put(index, SemanticRoleType.OBJECT);
-                        }
+                        word2Int.put(k, index); int2Word.put(index, k);
                         index++;
                     }
+                    if (pos == 0) {
+                        if (!subject2Int.containsKey(k)) {
+                            subject2Int.put(k, sindex++);
+                        }
+                    } else if (pos == 1) {
+                        if (!predicate2Int.containsKey(k)) {
+                            predicate2Int.put(k, pindex++);
+                        }
+                    } else if (pos == 2) {
+                        if (!object2Int.containsKey(k)) {
+                            object2Int.put(k, oindex++);
+                        }
+                    } else
+                        assert false;
+                    
                     int mappedInteger = word2Int.get(k);
-                    tmp.add(mappedInteger);
-                    sb.append(mappedInteger);
-                    sb.append(",");
-                    tokenidx++;
+                    indexBuf.add(mappedInteger);
+//                    sb.append(mappedInteger);
+//                    sb.append(",");
+//                    tokenidx++;
+                    pos++;
                 }
             }
-            mapped[d] = new int[tmp.size()];
-            for (int k = 0; k < tmp.size(); k++) {
-                mapped[d][k] = tmp.get(k);
+            indexedCorpus[d] = new int[indexBuf.size()];
+            for (int k = 0; k < indexBuf.size(); k++) {
+                indexedCorpus[d][k] = indexBuf.get(k);
             }
-
-            // deal with tuple without specific semantic role.
-            word2Int.put("null", index);
-
-            write("data/exper.mappedtuples/" + doc.getLabel(), sb.toString());
-            sb.delete(0, sb.length());
+            // write("data/exper.mappedtuples/" + doc.getLabel(), sb.toString());
+//            sb.delete(0, sb.length());
         }
-        return mapped;
+        return indexedCorpus;
     }
 
     public boolean isNull(String word) {
@@ -146,23 +161,23 @@ public class IndexProcessor {
         return word2Int.get("null");
     }
 
-    public int getVocabulary() {
+    public int getVocabularySize() {
         return int2Word.size();
     }
 
-    public int getSubjectCount() {
-        return subjectCount;
+    public int getSubjectSize() {
+        return subject2Int.size();
     }
 
-    public int getVerbCount() {
-        return verbCount;
+    public int getPredicateCount() {
+        return predicate2Int.size();
     }
 
     public int getObjectCount() {
-        return objectCount;
+        return object2Int.size();
     }
 
-    public int getTupleNumber() {
+    public int getTupleCount() {
         return tupleCount;
     }
 
@@ -186,7 +201,7 @@ public class IndexProcessor {
         StringBuffer sb = new StringBuffer();
         sb.append("Index size is: " + getWordCount());
         sb.append("\n");
-        sb.append("Number of tuple is: " + getTupleNumber());
+        sb.append("Number of tuple is: " + getTupleCount());
         sb.append("\n");
         sb.append("Word2Int: \n");
         sb.append(word2Int.toString());
