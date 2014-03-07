@@ -19,15 +19,13 @@ import flag.SemanticRoleType;
  * @author Yang Zhou
  * 
  */
-public class Indexr {
+public class XIndexr {
     private static String nullString = "null";
     /**
      * Mapping word to int
      */
     private Map<String, Integer> word2Int;
-    private Map<String, Integer> subject2Int;
-    private Map<String, Integer> predicate2Int;
-    private Map<String, Integer> object2Int;
+    private Map<String, Integer>[] role2Int;
     /**
      * Mapping int back to word
      */
@@ -42,43 +40,39 @@ public class Indexr {
 //    private int predicateCount;
 //    private int objectCount;
 
-    static class ConventerHolder {
-        static Indexr instance = new Indexr();
-    }
-
-    private Indexr() {
+    public XIndexr() {
         word2Int = new HashMap<String, Integer>();
-        subject2Int =new HashMap<String, Integer>(); 
-        predicate2Int =new HashMap<String, Integer>();
-        object2Int =new HashMap<String, Integer>();
         int2Word = new HashMap<Integer, String>();
         int2Role = new HashMap<Integer, SemanticRoleType>();
+        
     }
 
-    public static Indexr getInstance() {
-        return ConventerHolder.instance;
-    }
-
-    public int[][] doIndex(List<Document> corpus) throws IOException {
+    
+    @SuppressWarnings("unchecked")
+    public int[][] doIndex(List<Document> corpus, int roleNum) throws IOException {
         // map word to int
         int[][] indexedCorpus = new int[corpus.size()][];
         tupleCount = 0;
 
         // deal with tuple without specific semantic role.
         word2Int.put(nullString, 0);
-        subject2Int.put(nullString, 0);
-        predicate2Int.put(nullString, 0);
-        object2Int.put(nullString, 0);
-        int index=0,sindex=0, pindex=0, oindex=0;
+        
+        role2Int = new Map[roleNum];
+        
+        for (int i = 0; i < roleNum; i++)
+            role2Int[i] = new HashMap<String, Integer>();
+        int[] roleIndex = new int[roleNum];
+        
+        int index=0;
         for (int d = 0; d < corpus.size(); d++) {
             Document doc = corpus.get(d);
             // Separate file into tuples
             StringTokenizer st = new StringTokenizer(doc.getContent(), "\n");
             tupleCount += st.countTokens();
             List<Integer> indexBuf = new LinkedList<Integer>();
-            int current = 1;
+//            int current = 1;
             while (st.hasMoreTokens()) {
-                System.out.println(current++ + " -- "+tupleCount);
+//                System.out.println(current++ + " -- "+tupleCount);
                 String line = st.nextToken();
                 // Separate a tuple into SVO
                 StringTokenizer st2 = new StringTokenizer(line, "\t");
@@ -95,20 +89,9 @@ public class Indexr {
                         word2Int.put(k, index); int2Word.put(index, k);
                         index++;
                     }
-                    if (pos == 0) {
-                        if (!subject2Int.containsKey(k)) {
-                            subject2Int.put(k, sindex++);
-                        }
-                    } else if (pos == 1) {
-                        if (!predicate2Int.containsKey(k)) {
-                            predicate2Int.put(k, pindex++);
-                        }
-                    } else if (pos == 2) {
-                        if (!object2Int.containsKey(k)) {
-                            object2Int.put(k, oindex++);
-                        }
-                    } else
-                        assert false;
+                    
+                    if (!role2Int[pos].containsKey(k))
+                        role2Int[pos].put(k, ++roleIndex[pos]);
                     
                     int mappedInteger = word2Int.get(k);
                     indexBuf.add(mappedInteger);
@@ -159,18 +142,6 @@ public class Indexr {
         return int2Word.size();
     }
 
-    public int getSubjectSize() {
-        return subject2Int.size();
-    }
-
-    public int getPredicateCount() {
-        return predicate2Int.size();
-    }
-
-    public int getObjectCount() {
-        return object2Int.size();
-    }
-
     public int getTupleCount() {
         return tupleCount;
     }
@@ -188,8 +159,7 @@ public class Indexr {
     }
     
     public int getRoleCount(int i) {
-        // TODO get role size
-        return -1;
+        return role2Int[i].size();
     }
 
     public void save(String path) throws IOException {

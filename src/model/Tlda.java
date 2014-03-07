@@ -274,16 +274,7 @@ public class Tlda {
                 + THIN_INTERVAL + ").");
 
         for (int i = 0; i < ITERATIONS; i++) {
-            // for all z_i
-//            for (int m = 0; m < z.length; m++) {
-//                for (int n = 0; n < z[m].length; n++) {
-//                    // (z_i = z[m][n])
-//                    // sample from p(z_i|z_-i, w)
-//                    int frame = sampleFullConditional(m, n);
-//                    z[m][n] = frame;
-//                }
-//            }
-
+            System.out.println("Iteration: " + i);
             // the full conditional is the same, but the statistical matrix 
             // used is different, so separate them into 3 function
             
@@ -561,19 +552,26 @@ public class Tlda {
         }
 
         pw.append("===========Frame-SR distribution============\n");
+        double hold = 0.01;
         for (int k = 0; k < K; k++) {
             pw.append("***Frame " + k + "***\n");
             
             pw.append("**subject**\n");
             for (int w = 0; w < V; w++) {
+                if (psi[k][w] < hold)
+                    pw.append("\t");
                 pw.append(indexer.index2Word(w) + ": " + psi[k][w] + "\n");
             }
             pw.append("**predicate**\n");
             for (int w = 0; w < V; w++) {
+                if (zeta[k][w] < hold)
+                    pw.append("\t");
                 pw.append(indexer.index2Word(w) + ": " + zeta[k][w] + "\n");
             }
             pw.append("**object**\n");
             for (int w = 0; w < V; w++) {
+                if (phi[k][w] < hold)
+                    pw.append("\t");
                 pw.append(indexer.index2Word(w) + ": " + phi[k][w] + "\n");
             }
             
@@ -601,20 +599,20 @@ public class Tlda {
                 + "using Gibbs Sampling.");
 
         Tlda lda = new Tlda(docs);
-        int iterations = 1000000;
-        int burnIn = 20000;
-        int thinInterval = 100;
+        int iterations = 10000;
+        int burnIn = 5000;
+        int thinInterval = 10;
         int sampleLag = 10;
         lda.configure(iterations, burnIn, thinInterval, sampleLag);
 
         int K = 4; // Frame number
-        double alpha = 2; // good values
+        double alpha = 0.5; // good values
         double beta = .05; // good values
         double delta = .05; // good values
         double gamma = .05; // good values
         lda.gibbs(K, alpha, beta, delta, gamma);
 
-        PrintWriter pw = new PrintWriter("./data/artificial_tuples.txt");
+        PrintWriter pw = new PrintWriter("./data/reconstruct_simple.txt");
         lda.printDistributions(pw);
 //        lda.printTuple(pw);
         pw.close();
