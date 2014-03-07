@@ -19,7 +19,7 @@ import flag.SemanticRoleType;
  * @author Yang Zhou
  * 
  */
-public class XIndexr {
+public class MultiRoleIndexr {
     private static String nullString = "null";
     /**
      * Mapping word to int
@@ -40,7 +40,7 @@ public class XIndexr {
 //    private int predicateCount;
 //    private int objectCount;
 
-    public XIndexr() {
+    public MultiRoleIndexr() {
         word2Int = new HashMap<String, Integer>();
         int2Word = new HashMap<Integer, String>();
         int2Role = new HashMap<Integer, SemanticRoleType>();

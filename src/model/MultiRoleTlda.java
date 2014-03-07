@@ -9,14 +9,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import processor.XIndexr;
+import processor.MultiRoleIndexr;
 import structure.Document;
 
-public class XTlda {
+public class MultiRoleTlda {
 
     private int[][] documents; // document data (term lists)
 
-    private XIndexr indexer;
+    private MultiRoleIndexr indexer;
     private int V; // vocabulary size
     private int[] RC; // semantic role count
   
@@ -132,9 +132,9 @@ public class XTlda {
 
     // private static int dispcol = 0;
 
-    public XTlda(List<Document> docs, int roleNum) throws IOException {
+    public MultiRoleTlda(List<Document> docs, int roleNum) throws IOException {
         this.R = roleNum;
-        this.indexer = new XIndexr();
+        this.indexer = new MultiRoleIndexr();
         this.documents = indexer.doIndex(docs, roleNum);
         this.V = indexer.getVocabularySize();
         this.RC = new int[roleNum];
@@ -479,7 +479,7 @@ public class XTlda {
         double[] betas = new double[R];
         Arrays.fill(betas, 0.05);
         
-        XTlda lda = new XTlda(docs, R);
+        MultiRoleTlda lda = new MultiRoleTlda(docs, R);
         int iterations = 10000;
         int burnIn = 5000;
         int thinInterval = 10;
