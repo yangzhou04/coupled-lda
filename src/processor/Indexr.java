@@ -4,8 +4,8 @@ import static util.Utils.write;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
@@ -75,7 +75,7 @@ public class Indexr {
             // Separate file into tuples
             StringTokenizer st = new StringTokenizer(doc.getContent(), "\n");
             tupleCount += st.countTokens();
-            List<Integer> indexBuf = new LinkedList<Integer>();
+            List<Integer> indexBuf = new ArrayList<Integer>();
             int current = 1;
             while (st.hasMoreTokens()) {
                 System.out.println(current++ + " -- "+tupleCount);

@@ -5,7 +5,6 @@ import static util.Utils.write;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
@@ -47,7 +46,6 @@ public class MultiRoleIndexr {
         
     }
 
-    
     @SuppressWarnings("unchecked")
     public int[][] doIndex(List<Document> corpus, int roleNum) throws IOException {
         // map word to int
@@ -69,10 +67,8 @@ public class MultiRoleIndexr {
             // Separate file into tuples
             StringTokenizer st = new StringTokenizer(doc.getContent(), "\n");
             tupleCount += st.countTokens();
-            List<Integer> indexBuf = new LinkedList<Integer>();
-//            int current = 1;
-            while (st.hasMoreTokens()) {
-//                System.out.println(current++ + " -- "+tupleCount);
+            int[] indexBuf = new int[roleNum*tupleCount];
+            for (int lineno = 0;st.hasMoreTokens();lineno++) {
                 String line = st.nextToken();
                 // Separate a tuple into SVO
                 StringTokenizer st2 = new StringTokenizer(line, "\t");
@@ -80,8 +76,7 @@ public class MultiRoleIndexr {
                     System.err.println("Input data format error. Please check!");
                     System.exit(-1);
                 }
-                int pos = 0;
-                while (st2.hasMoreTokens()) {
+                for (int pos=0; st2.hasMoreTokens(); pos++) {
                     String k = st2.nextToken().trim();
 
                     // if find a new word
@@ -89,19 +84,14 @@ public class MultiRoleIndexr {
                         word2Int.put(k, index); int2Word.put(index, k);
                         index++;
                     }
-                    
+
                     if (!role2Int[pos].containsKey(k))
                         role2Int[pos].put(k, ++roleIndex[pos]);
-                    
-                    int mappedInteger = word2Int.get(k);
-                    indexBuf.add(mappedInteger);
-                    pos++;
+
+                    indexBuf[lineno*roleNum + pos] = word2Int.get(k);
                 }
             }
-            indexedCorpus[d] = new int[indexBuf.size()];
-            for (int k = 0; k < indexBuf.size(); k++) {
-                indexedCorpus[d][k] = indexBuf.get(k);
-            }
+            indexedCorpus[d] = indexBuf;
         }
         return indexedCorpus;
     }

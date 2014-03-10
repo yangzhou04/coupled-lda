@@ -3,141 +3,60 @@ package model;
 import static util.Utils.read;
 
 import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.TreeMap;
 
 import processor.MultiRoleIndexr;
 import structure.Document;
 
 public class MultiRoleTlda {
-
-    private int[][] documents; // document data (term lists)
-
     private MultiRoleIndexr indexer;
+    
+    
+    private int[][] documents; // document data (term lists)
     private int V; // vocabulary size
     private int[] RC; // semantic role count
-  
-
+    private String[] roleNames;
     private int K; // number of frames
     private int R; // number of roles
 
     private double alpha; // Dirichlet parameter (document--frame associations)
-//    private double beta;  
     private double[] betas; // frame -- role realizations
-//    private double delta;
-//    private double gamma;
 
-    /**
-     * frame assignments for each word.
-     */
-    // private int[][] z;
-    
-//    // frame assignments for each subject.
-//    private int[][] s;
-//    // frame assignments for each predicate.
-//    private int[][] p;
-//    // frame assignments for each object.
-//    private int[][] o;
     private int[][][] r; // frame assignments for each role.
-
-    /**
-     * cwt[i][j] number of instances of word i (term?) assigned to frame j.
-     */
-//    private int[][] nw;
-//    // number of instances of subject i assigned to frame j
-//    private int[][] ns;
-//    // number of instances of predicate i assigned to frame j
-//    private int[][] np;
-//    // number of instances of object i assigned to frame j
-//    private int[][] no;
-    
     private int[][][] nr; // number of instances of role i assigned to frame j
-
-    /**
-     * na[i][j] number of words in document i assigned to frame j.
-     */
-//    private int[][] nd;
-//    // number of subjects in document i assigned to frame j.
-//    private int[][] nds;
-//    // number of predicates in document i assigned to frame j.
-//    private int[][] ndp;
-//    // number of objects in document i assigned to frame j.
-//    private int[][] ndo;
     private int[][][] ndr; // number of roles in document i assigned to frame j
-
-    /**
-     * nwsum[j] total number of words assigned to frame j.
-     */
-//    private int[] nwsum;
-//    // total number of subjects assigned to frame j
-//    private int[] nssum;
-//    // total number of predicates assigned to frame j
-//    private int[] npsum;
-//    // total number of objects assigned to frame j
-//    private int[] nosum;
     private int[][] nrsum; // total number of roles assigned to frame j
-
-    /**
-     * nasum[i] total number of words in document i.
-     */
-//    private int[] ndsum;
-//    // total number of subjects in document i.
-//    private int[] ndssum;
-//    // total number of predicates in document i.
-//    private int[] ndpsum;
-//    // total number of objects in document i.
-//    private int[] ndosum;
     private int[][] ndrsum; // total number of roles in document i
 
-    /**
-     * cumulative statistics of theta, delta, gamma
-     */
-    private double[][] thetasum;
+    private double[][] thetasum; // cumulative statistics of theta, delta, gamma
+    private double[][][] phisum; // cumulative statistics of phi
+    private int numstats; // size of statistics
+    private double[][] theta;
+    private double[][][] phi;
 
-    /**
-     * cumulative statistics of phi
-     */
-//    private double[][] phisum;
-//    private double[][] zetasum;
-//    private double[][] psisum;
-    private double[][][] phisum;
+    private int THIN_INTERVAL = 20; // sampling lag (?)
+    private int BURN_IN = 100; // burn-in period
+    private int ITERATIONS = 1000; // max iterations
+    private int SAMPLE_LAG; // sample lag (if -1 only one sample taken)
 
-    /**
-     * size of statistics
-     */
-    private int numstats;
-
-    /**
-     * sampling lag (?)
-     */
-    private int THIN_INTERVAL = 20;
-
-    /**
-     * burn-in period
-     */
-    private int BURN_IN = 100;
-
-    /**
-     * max iterations
-     */
-    private int ITERATIONS = 1000;
-
-    /**
-     * sample lag (if -1 only one sample taken)
-     */
-    private int SAMPLE_LAG;
-
-    // private static int dispcol = 0;
-
-    public MultiRoleTlda(List<Document> docs, int roleNum) throws IOException {
+    public MultiRoleTlda(List<Document> docs, int roleNum, String[] roleNames) throws IOException {
         this.R = roleNum;
         this.indexer = new MultiRoleIndexr();
         this.documents = indexer.doIndex(docs, roleNum);
         this.V = indexer.getVocabularySize();
         this.RC = new int[roleNum];
+        this.roleNames = roleNames;
         for (int i = 0; i < R; i++)
             this.RC[i] = indexer.getRoleCount(i);
     }
@@ -153,28 +72,14 @@ public class MultiRoleTlda {
      */
     public void initialState(int K) {
         int M = documents.length;
-
+        phi = new double[R][K][V];
+        theta = new double[M][K];
         // initialise count variables.
-//        ns = new int[V][K];
-//        np = new int[V][K];
-//        no = new int[V][K];
-//        nds = new int[M][K];
-//        ndp = new int[M][K];
-//        ndo = new int[M][K];
-//        nssum = new int[K];
-//        npsum = new int[K];
-//        nosum = new int[K];
-//        ndssum = new int[M];
-//        ndpsum = new int[M];
-//        ndosum = new int[M];
         nr = new int[R][V][K];
         ndr = new int[R][M][K];
         nrsum = new int[R][K];
         ndrsum = new int[R][M];
 
-//        s = new int[M][];
-//        p = new int[M][];
-//        o = new int[M][];
         r = new int[R][M][];
         for (int m = 0; m < M; m++) {
             int N = documents[m].length / 3;
@@ -337,14 +242,10 @@ public class MultiRoleTlda {
      * @return theta multinomial mixture of document frames (M x K)
      */
     public double[][] getTheta() {
-        double[][] theta = new double[documents.length][K];
-
         if (SAMPLE_LAG > 0) {
-            for (int m = 0; m < documents.length; m++) {
-                for (int k = 0; k < K; k++) {
+            for (int m = 0; m < documents.length; m++) 
+                for (int k = 0; k < K; k++) 
                     theta[m][k] = thetasum[m][k] / numstats;
-                }
-            }
         } else {
             for (int m = 0; m < documents.length; m++) {
                 for (int k = 0; k < K; k++) {
@@ -371,25 +272,16 @@ public class MultiRoleTlda {
      * @return phi multinomial mixture of frame words (K x V)
      */
     public double[][][] getPhi() {
-        double[][][] phi = new double[R][K][V];
         if (SAMPLE_LAG > 0) {
-            for (int j = 0; j < R; j++) {
-                for (int k = 0; k < K; k++) {
-                    for (int w = 0; w < V; w++) {
+            for (int j = 0; j < R; j++) 
+                for (int k = 0; k < K; k++) 
+                    for (int w = 0; w < V; w++)
                         phi[j][k][w] = phisum[j][k][w] / numstats;
-                    }
-//                    phi[k][w] = phisum[k][w] / numstats;
-                }
-            }
         } else {
-            for (int j = 0; j < R; j++) {
-                for (int k = 0; k < K; k++) {
-                    for (int w = 0; w < V; w++) {
+            for (int j = 0; j < R; j++) 
+                for (int k = 0; k < K; k++) 
+                    for (int w = 0; w < V; w++) 
                         phi[j][k][w] = (nr[j][w][k] + betas[j]) / (nrsum[j][k] + RC[j] * betas[j]);
-                    }
-//                        phi[k][w] = (nw[w][k] + beta) / (nwsum[k] + V * beta);
-                }
-            }
         }
         return phi;
     }
@@ -414,13 +306,8 @@ public class MultiRoleTlda {
         this.SAMPLE_LAG = sampleLag;
     }
 
-    public void printDistributions(PrintWriter pw) {
+    public void printDocFrameDist(PrintWriter pw) {
         double[][] theta = getTheta();
-        double[][][] phi = getPhi();
-//        double[][] zeta = getZeta();
-//        double[][] psi = getPsi();
-
-        pw.append("=========== Document-Frame distribution============\n");
         for (int d = 0; d < documents.length; d++) {
             pw.append("Document" + d + "\n");
             for (int k = 0; k < K; k++) {
@@ -430,26 +317,72 @@ public class MultiRoleTlda {
             }
             pw.append("\n\n");
         }
-
-        pw.append("===========Frame-SR distribution============\n");
-        double hold = 0.01;
+    }
+    
+    public void printFrameRoleDist(PrintWriter pw, double theshold) {
+        double[][][] phi = getPhi();
         for (int k = 0; k < K; k++) {
-            pw.append("***Frame " + k + "***\n");
-            
+            pw.append("=== Frame " + k + " ===\n");
             for (int j = 0; j < R; j++) {
-                pw.append("----Role type: " + j + "\n");
+                pw.append("=>Role type: " + roleNames[j] + "\n");
                 for (int w = 0; w < V; w++) {
-                    if (phi[j][k][w] < hold)
-                        pw.append("\t");
-                    pw.append(indexer.index2Word(w) + ": " + phi[j][k][w] + "\n");
+                    if (phi[j][k][w] >= theshold)
+                        pw.append(indexer.index2Word(w) + ": " + phi[j][k][w] + "\n");
                 }
             }
-
             pw.append("\n\n");
         }
-
     }
 
+    public void printFrameAssign(PrintWriter pw) {
+        for (int j = 0; j < r.length; j++) {
+            pw.append("======== " + roleNames[j] + " ========\n");
+            for (int m = 0; m < r[j].length; m++) {
+                for (int n = j; n < r[j][m].length; n+=R) {
+                    if (n % 10 == 0)
+                        pw.append("\n");
+                    pw.append(documents[m][n]+"("+indexer.index2Word(documents[m][n])
+                            +"):"+r[j][m][n] + " ");
+                }
+            }
+            pw.append("\n\n");
+        }
+    }
+    
+            
+    public void printFrame(PrintWriter pw, int topK, double theashold) {
+        double[][][] phi = getPhi();
+        for (int k = 0; k < K; k++) {
+            pw.append("=== Frame " + k + " ===\n");
+            for (int j = 0; j < R; j++) {
+                pw.append("=>Role type: " + roleNames[j] + "\n");
+                Map<String, Double> rolesDist = new TreeMap<String, Double>();
+                for (int w = 0; w < V; w++) {
+                    rolesDist.put(indexer.index2Word(w), phi[j][k][w]);
+                }
+                Set<Entry<String, Double>> entries = rolesDist.entrySet();
+                List<Entry<String, Double>> lists = new ArrayList<Entry<String, Double>>(entries);
+                final Comparator<Entry<String, Double>> COMPARE_BY_VALUE = 
+                        new Comparator<Entry<String, Double>>() {
+                            @Override
+                            public int compare(Entry<String, Double> o1, Entry<String, Double> o2) {
+                                return -o1.getValue().compareTo(o2.getValue());
+                            }
+                        };
+                Collections.sort(lists, COMPARE_BY_VALUE);
+                for (int z = 0; z < topK && z < lists.size(); z++) {
+                    if (lists.get(z).getValue() >= theashold) {
+                        pw.append(lists.get(z).getKey());
+                        pw.append(":" + lists.get(z).getValue() + "\n");
+                    }
+                }
+                pw.append("\n");
+            }
+            
+            pw.append("\n\n");
+        }
+    }
+    
     /**
      * Driver with example data.
      * 
@@ -457,40 +390,56 @@ public class MultiRoleTlda {
      * @throws IOException
      */
     public static void main(String[] args) throws IOException {
-        // Read tuple "./data/muc34-tuple/";
-        final String dir = "./data/artificial/";
+        final String dir = "./data/cpa/";
         List<Document> docs = new ArrayList<Document>();
         File dirFile = new File(dir);
-        for (String docLabel : dirFile.list()) {
+        String[] data = dirFile.list(new FilenameFilter() {
+            @Override
+            public boolean accept(File arg0, String arg1) {
+                return arg1.endsWith(".dat");
+            }
+        });
+        for (String docLabel : data) {
             docs.add(new Document(docLabel, read(dir + docLabel)));
         }
 
         System.out.println("Tuple Latent Dirichlet Allocation "
                 + "using Gibbs Sampling.");
 
-        
-        int K = 4; // Frame number
+        int K = 800; // Frame number
         int R = 3; // role number
         String[] roleNames = new String[R];
         roleNames[0] = "subject";
         roleNames[1] = "predicate";
         roleNames[2] = "object";
-        double alpha = 0.5; // good values
+        double alpha = 50/K; // good values
         double[] betas = new double[R];
-        Arrays.fill(betas, 0.05);
+        Arrays.fill(betas, 0.01);
         
-        MultiRoleTlda lda = new MultiRoleTlda(docs, R);
-        int iterations = 10000;
-        int burnIn = 5000;
-        int thinInterval = 10;
-        int sampleLag = 10;
+        MultiRoleTlda lda = new MultiRoleTlda(docs, R, roleNames);
+        int iterations = 1000;
+        int burnIn = 500;
+        int thinInterval = 5;
+        int sampleLag = 5;
         lda.configure(iterations, burnIn, thinInterval, sampleLag);
         lda.gibbs(K, alpha, betas);
 
-        PrintWriter pw = new PrintWriter("./data/reconstruct.txt");
-        lda.printDistributions(pw);
-//        lda.printTuple(pw);
-        pw.close();
+        PrintWriter fassign = new PrintWriter(dir+"model.fassign");
+        PrintWriter docFrameDist = new PrintWriter(dir+"model.dfd");
+        PrintWriter frameRoleDist = new PrintWriter(dir+"model.frd");
+        PrintWriter frame = new PrintWriter(dir+"model.frame");
+        
+        int topK = 20;
+        lda.printFrameAssign(fassign);
+        lda.printDocFrameDist(docFrameDist);
+        double theshold = 0.001;
+        lda.printFrameRoleDist(frameRoleDist, theshold);
+        lda.printFrame(frame, topK, theshold);
+        
+        fassign.close();
+        docFrameDist.close();
+        frameRoleDist.close();
+        frame.close();
     }
 
 }
