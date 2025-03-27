@@ -1,2 +1,2 @@
-tlda
+coupled-lda
 ====
